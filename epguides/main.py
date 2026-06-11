@@ -17,12 +17,11 @@ Deployment:
         $ uv run python main.py
 """
 
-from typing import Any
+from fastapi import FastAPI
 
-from fastapi import FastAPI, Query
-
-from client import ShowAPIClient
-from config import settings
+from epguides.config.settings import settings
+from epguides.controllers.api_router import router as api_router
+from epguides.services.client import ShowAPIClient
 
 app = FastAPI(title="Show Management Service")
 
@@ -30,14 +29,7 @@ app = FastAPI(title="Show Management Service")
 show_client = ShowAPIClient()
 
 
-@app.get("/all-shows/")
-def get_local_shows(
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(100, ge=1, le=100, description="Items per page"),
-) -> dict[str, Any]:
-    """FastAPI endpoint that consume the external OOP API client."""
-    data = show_client.fetch_shows(page=page, limit=limit)
-    return data
+app.include_router(api_router, prefix="/api/v1", tags=["Shows"])
 
 
 # Clean up client connections when application shuts down
@@ -57,4 +49,6 @@ if __name__ == "__main__":
     import uvicorn
 
     # Use the configuration file directly yo boot Uvicorn
-    uvicorn.run("main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run(
+        "epguides.main:app", host=settings.host, port=settings.port, reload=True
+    )

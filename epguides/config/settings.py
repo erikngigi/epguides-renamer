@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Dynamically locate the absolute path to your project root
 # This ensures nested directories can find the .env file
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class AppConfig(BaseSettings):
@@ -38,6 +38,7 @@ class AppConfig(BaseSettings):
 
     base_api_url: str
     all_shows_endpoint: str
+    search_shows_endpoint: str
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore"
