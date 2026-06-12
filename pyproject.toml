@@ -2,9 +2,7 @@
 name = "epguides-renamer"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = [
-    "rapidfuzz>=3.14.5",
-]
+dependencies = ["rapidfuzz>=3.14.5"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
@@ -37,7 +35,7 @@ exclude = [
   "venv",
 ]
 # Same as Black.
-line-length = 80
+line-length = 120
 indent-width = 4
 # Assume Python 3.14
 target-version = "py314"
