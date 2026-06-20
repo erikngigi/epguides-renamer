@@ -3,9 +3,11 @@
 from typing import Any, Dict, Optional, cast
 
 import httpx
+from fastapi import HTTPException
 
-from epguides.config.settings import settings
+from epguides.schemas.shows import ShowMetadataDetail, ShowSearchItem, ShowSeasonEpisodes
 from epguides.services.base_client import BaseAPIClient
+from epguides.settings import settings
 
 
 class ShowAPIClient(BaseAPIClient):
@@ -13,42 +15,59 @@ class ShowAPIClient(BaseAPIClient):
 
     def __init__(self) -> None:
         # Call the parent class __init__ and pass the global base URL
-        super().__init__(base_url=settings.base_api_url)
+        super().__init__(base_url=settings.epguides_show_url)
         # Define this client's unique path
-        self.target_url = f"{self.base_url}/{settings.all_shows_endpoint.lstrip('/')}"
+        self.target_url = f"{self.base_url}"
 
-    def fetch_shows(self, page: int = 1, limit: int = 100) -> Dict[str, Any]:
-        """Fetches a paginated list of shows."""
+    def fetch_shows(self, page: int = 1, limit: int = 100) -> list[ShowSearchItem]:
+        """Fetches a paginated list of shows validated as Pydantic objects.
+
+        Raises:
+            HTTPException: If an upstream network or service error occurs.
+        """
         params = {"page": page, "limit": limit}
         try:
             response = self.client.get(self.target_url, params=params)
             response.raise_for_status()
-            return cast(Dict[str, Any], response.json())
-        except httpx.HTTPError as exc:
-            return {"error": f"Network error: {exc}"}
 
-    def search_shows(self, query: str) -> list[Any] | dict[str, Any]:
+            raw_data = response.json()
+            return [ShowSearchItem(**item) for item in raw_data]
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Upsteam API pagination fetch failed: {exc}")
+
+    def search_shows(self, query: str) -> list[ShowSearchItem]:
         """Searches for a specific TV show by its name string fragment.
 
         Args:
             query (str): The search phrase or title piece of the target show.
 
         Returns:
-            list[Any]: A list of matched show dictionaries if successful,
-                or an error dictionary containing diagnostic details on failure.
+            List[ShowSearchItem]: A clean sequence of structured, validated shows.
+
+        Raises:
+            HTTPException: If the upstream service disconnects or returns bad data.
         """
         search_url = f"{self.target_url.rstrip('/')}/{settings.search_shows_endpoint}"
-
         params: dict[str, Any] = {"query": query}
 
         try:
             response = self.client.get(search_url, params=params)
             response.raise_for_status()
-            return cast(list[Any], response.json())
-        except httpx.HTTPError as exc:
-            return {"error": f"Search endpoint failed: {exc}"}
 
-    def fetch_show_metadata(self, epguides_key: str) -> dict[str, Any]:
+            raw_data = response.json()
+
+            # Boundary guard: handling cases where the API returns an unexpected data layout
+            if not isinstance(raw_data, list):
+                raise HTTPException(
+                    status_code=502, detail="Upstream API returned an invalid data format (expected and array)."
+                )
+
+            return [ShowSearchItem(**item) for item in raw_data]
+
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Upstream network search endpoint failed: {exc}")
+
+    def fetch_show_metadata(self, epguides_key: str) -> ShowMetadataDetail:
         """Fetches the metadata of a specific TV show using the TV Shows epguides_key.
 
         Args:
@@ -62,6 +81,39 @@ class ShowAPIClient(BaseAPIClient):
         try:
             response = self.client.get(search_url)
             response.raise_for_status()
-            return cast(dict[str, Any], response.json())
+
+            return ShowMetadataDetail(**response.json())
+
         except httpx.HTTPError as exc:
-            return {"error": f"Search endpoint failed: {exc}"}
+            raise HTTPException(status_code=502, detail=f"Upstream metadata lookup failed for '{epguides_key}': {exc}")
+
+    def fetch_season_metadata(self, epguides_key: str, season_num: int) -> list[ShowSeasonEpisodes]:
+        """Fetches the season metadata of a specific TV Show using the epguides_key and a optional season params.
+
+        Args:
+            epguides_key (str): The key of the target show.
+            season_num (int): The season of the target show.
+
+        Returns:
+            list[Any]: A list of the matched TV show seasonal episode metadata if successful.
+        """
+        search_url = f"{self.target_url.rstrip('/')}/{epguides_key}/seasons/{season_num}/episodes"
+
+        params: dict[str, Any] = {"epguides_key": epguides_key, "season_num": season_num}
+
+        try:
+            response = self.client.get(search_url, params=params)
+            response.raise_for_status()
+
+            raw_data = response.json()
+
+            # Boundary guard: handling cases where the API returns an unexpected data layout
+            if not isinstance(raw_data, list):
+                raise HTTPException(
+                    status_code=502, detail="Upstream API returned an invalid data format (expected and array)."
+                )
+
+            return [ShowSeasonEpisodes(**item) for item in raw_data]
+
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"Upstream season_number search endpoint failed: {exc}")

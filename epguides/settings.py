@@ -6,14 +6,13 @@ endpoint connections. It exports a singleton `settings` object for
 application-wide usage.
 """
 
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Dynamically locate the absolute path to your project root
 # This ensures nested directories can find the .env file
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 class AppConfig(BaseSettings):
@@ -36,13 +35,10 @@ class AppConfig(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
 
-    base_api_url: str
-    all_shows_endpoint: str
+    epguides_show_url: str
     search_shows_endpoint: str
 
-    model_config = SettingsConfigDict(
-        env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = AppConfig()
